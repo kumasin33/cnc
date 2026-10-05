@@ -1,0 +1,158 @@
+<!DOCTYPE html><html lang="sr"><head><meta charset="utf-8"><title>CNC Konus</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<style>
+:root{--bg:#fafafa;--fg:#222;--card:#e3e3e3;--on:#ffe97a;--line:#999;--g:#4caf50;--r:#d33;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#1b1b1b;--fg:#eee;--card:#333;--on:#7a6a00;--line:#777}}
+:root[data-theme="dark"]{--bg:#1b1b1b;--fg:#eee;--card:#333;--on:#7a6a00;--line:#777}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font:16px system-ui,sans-serif;max-width:560px;margin:auto;padding:8px}
+h1{margin:0 0 8px;font-size:20px;background:#ffff99;color:#222;padding:10px;border-radius:6px}
+.row{display:grid;grid-template-columns:62px 1fr 1fr 1fr;gap:6px;align-items:center;margin:4px 0}
+.row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin:4px 0}
+input{width:100%;padding:8px;font-size:16px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--fg)}
+label small{display:block;font-size:12px;opacity:.7}
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:5px}.grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:5px}
+.b{background:var(--card);border:2px solid transparent;border-radius:6px;padding:4px;display:flex;justify-content:center;align-items:center;cursor:pointer;color:var(--fg);font-size:15px}
+.b.on{background:var(--on);border-color:#e0a800}.grid .b,.grid4 .b{width:100%}.b{-webkit-appearance:none;appearance:none}.b svg{width:46px;height:46px;flex:none;display:block}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:10px}h3{margin:10px 0 4px;font-size:14px}
+button.act{padding:11px;font-size:16px;border-radius:6px;border:0;background:#4caf50;color:#fff;cursor:pointer}
+canvas{width:100%;height:auto;aspect-ratio:1/1;display:block;border:1px solid var(--line);border-radius:8px;margin-top:8px}
+pre{background:var(--card);padding:10px;border-radius:6px;white-space:pre-wrap;font-size:15px;min-height:60px}
+#pm{position:absolute;display:none;width:38px;height:34px;border:0;border-radius:6px;background:#667;color:#fff;font-size:20px;z-index:9;padding:0}input.sg{padding-right:46px}input[data-t="1"]{color:#2255ff;font-weight:600}.err{color:var(--r);min-height:20px}.sel{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+</style></head><body>
+<noscript><p style="color:#c00;font-weight:700">JavaScript je isključen. Otvori ovu stranicu u Safariju (ne kao preuzetu datoteku u Files).</p></noscript>
+<h1>CNC konus / radijus<div style="font-size:13px;font-weight:400;margin-top:2px">created by Anel</div></h1>
+<div class="row"><span></span><b>X</b><b>Z</b><b>R</b></div>
+<div class="row"><b>Početni</b><input id="p1x" type="text" inputmode="decimal" autocomplete="off"><input id="p1z" type="text" inputmode="decimal" autocomplete="off"><input id="p1r" type="text" inputmode="decimal" autocomplete="off" placeholder="R"></div>
+<div class="row"><b>Krajnji</b><input id="p2x" type="text" inputmode="decimal" autocomplete="off"><input id="p2z" type="text" inputmode="decimal" autocomplete="off"><input id="p2r" type="text" inputmode="decimal" autocomplete="off" placeholder="R"></div>
+<div class="row3"><label><small>I (h)</small><input id="I" type="text" inputmode="decimal" autocomplete="off"></label><label><small>K (w)</small><input id="K" type="text" inputmode="decimal" autocomplete="off"></label><label><small>Theta °</small><input id="th" type="text" inputmode="decimal" autocomplete="off" value="45"></label></div>
+<div class="row3"><label><small>Radijus pločice</small><input id="R" type="text" inputmode="decimal" autocomplete="off" value="0.2"></label>
+<label class="sel" style="align-self:end"><input id="dia" type="checkbox" checked style="width:auto"> X = prečnik</label>
+</div>
+<div class="sel" id="rc" style="margin:2px 0">R: <button class="b" data-r="0.2">0.2</button><button class="b" data-r="0.4">0.4</button><button class="b" data-r="0.8">0.8</button><button class="b" data-r="1.2">1.2</button></div>
+<details id="cat" style="margin:6px 0"><summary><b>Katalog pločica</b></summary><input id="code" placeholder="npr. VCMT160404" style="text-transform:uppercase;margin:6px 0"><div id="info" style="display:flex;gap:10px;align-items:center;font-size:14px"></div><div id="chips" class="sel" style="margin-top:6px"></div></details>
+<div class="sel" style="margin:6px 0"><button class="act" id="calc">✔ Izračunaj</button><button class="act" id="sign" style="background:#667" title="promeni znak">±</button><button class="act" id="clr" style="background:#e08a00">✖ Obriši</button></div>
+<div class="err" id="err"></div>
+<div class="two"><div><h3>Vrh noža (T)</h3><div class="grid" id="tip"></div></div>
+<div><h3>Oblik / smer obrade</h3><div class="grid4" id="dir" style="grid-template-columns:1fr 1fr"></div></div></div>
+<canvas id="cv" width="560" height="560"></canvas>
+<h3>G-kod</h3><pre id="out">N1 G1 X0.</pre>
+<script>
+const $=id=>document.getElementById(id),num=id=>{const v=$(id).value.trim().replace(',','.'),x=parseFloat(v);return v===''||isNaN(x)?null:x};
+let tip=[-1,-1],sh=0,INS={ang:35,sh:'V',l:11.07,ic:6.35};const SH=[[1,'V','H'],[1,'H','H'],[1,'V','V'],[1,'H','V'],[-1,'H','H'],[-1,'H','V'],[-1,'V','V'],[-1,'V','H']];
+const DIRS=[[-1,1],[1,1],[-1,-1],[1,-1]]; // dz,dx
+function svgT(sx,sy){let ang=null;
+ if(sx&&sy){ang=[90,90-INS.ang].map(v=>v*Math.PI/180);if(sx>0)ang=ang.map(v=>Math.PI-v);if(sy>0)ang=ang.map(v=>-v)}
+ else if(sx||sy){const bb=Math.atan2(-sy,-sx),d=INS.ang/2*Math.PI/180;ang=[bb-d,bb+d]}
+ const cx=sx*8,cy=-sy*8,r=4,F=v=>v.toFixed(1);let body='';
+ if(ang){const L=26,A=[cx+Math.cos(ang[0])*L,cy-Math.sin(ang[0])*L],B=[cx+Math.cos(ang[1])*L,cy-Math.sin(ang[1])*L],D=[A[0]+B[0]-cx,A[1]+B[1]-cy];
+  body=`<polygon points="${F(cx)},${F(cy)} ${F(A[0])},${F(A[1])} ${F(D[0])},${F(D[1])} ${F(B[0])},${F(B[1])}" fill="rgba(150,150,160,.35)" stroke="#555" stroke-width="1.2" stroke-linejoin="round"/>`}
+ const tx=cx+sx*r,ty=cy-sy*r;
+ return`<svg viewBox="-24 -24 48 48">${body}<circle cx="${F(cx)}" cy="${F(cy)}" r="${r}" fill="#f0a040" stroke="#333" stroke-width="1"/><path d="M${F(tx-7)} ${F(ty)}H${F(tx+7)}M${F(tx)} ${F(ty-7)}V${F(ty+7)}" stroke="#d33" stroke-width="1.3"/></svg>`}
+function svgD(k){const[dx,a,b]=SH[k],y1=6*dx,y2=-6*dx;const e1=a=='H'?[22,y1]:[8,y1+14*dx],e2=b=='H'?[-22,y2]:[-8,y2-14*dx];return`<svg viewBox="-24 -24 48 48"><path d="M${e1} L8 ${y1} L-8 ${y2} L${e2}" fill="none" stroke="#777" stroke-width="3"/></svg>`}
+function build(){
+ $('tip').innerHTML='';for(let r=0;r<3;r++)for(let c=0;c<3;c++){const sx=c-1,sy=1-r,e=document.createElement('button');e.className='b'+(tip[0]==sx&&tip[1]==sy?' on':'');e.innerHTML=svgT(sx,sy);e.onclick=()=>{tip=[sx,sy];build();calc()};$('tip').append(e)}
+ $('dir').innerHTML='';SH.forEach((d,i)=>{const e=document.createElement('button');e.className='b'+(sh==i?' on':'');e.innerHTML=svgD(i);e.onclick=()=>{sh=i;build();calc()};$('dir').append(e)});
+}
+function inter(p,d,q,e){const c=d[0]*e[1]-d[1]*e[0];if(Math.abs(c)<1e-9)return p;const t=((q[0]-p[0])*e[1]-(q[1]-p[1])*e[0])/c;return[p[0]+d[0]*t,p[1]+d[1]*t]}
+let H=null;
+function calc(){
+ $('err').textContent='';const f=$('dia').checked?.5:1,[dx,a,b]=SH[sh],dz=-1;
+ const T=id=>$(id).dataset.t?num(id):null;
+ let w=T('K'),h=T('I');const p1z=T('p1z'),p2z=T('p2z'),p1x=T('p1x'),p2x=T('p2x');
+ if(w===null&&p1z!==null&&p2z!==null)w=Math.abs(p1z-p2z);
+ if(h===null&&p1x!==null&&p2x!==null)h=Math.abs(p2x-p1x)*f;
+ if(w===null&&h===null){$('err').textContent='Upiši npr. krajnji X, početni Z i K (ili I), pa Izračunaj.';return}
+ const thr=(T('th')===null?45:T('th'))*Math.PI/180;
+ if(w===null)w=h/Math.tan(thr);if(h===null)h=w*Math.tan(thr);
+ let z1,z2,r1,r2;
+ if(p1z!==null){z1=p1z;z2=z1+dz*w}else if(p2z!==null){z2=p2z;z1=z2-dz*w}else{z1=0;z2=dz*w}
+ if(p1x!==null){r1=p1x*f;r2=r1+dx*h}else if(p2x!==null){r2=p2x*f;r1=r2-dx*h}else{r1=0;r2=dx*h}
+ const P1=[z1,r1],P2=[z2,r2],L=Math.max(w,h,5)*.6+2;
+ const A_=(id,v)=>{const e=$(id);if(!e.dataset.t)e.value=+v.toFixed(4)};
+ A_('p1x',r1/f);A_('p1z',z1);A_('p2x',r2/f);A_('p2z',z2);A_('K',w);A_('I',h);A_('th',Math.atan2(h,w)*180/Math.PI);
+ const s1=a=='H'?[dz,0]:[0,dx],s2=b=='H'?[dz,0]:[0,dx];
+ const A=[P1[0]-s1[0]*L,P1[1]-s1[1]*L],B=[P2[0]+s2[0]*L,P2[1]+s2[1]*L],hyp=Math.hypot(w,h);
+ const dd=[[s1[0],s1[1]],[dz*w/hyp,dx*h/hyp],s2];
+ const R=num('R')||0,t=tip,pts=[A,P1,P2,B],fr=[num('p1r')||0,num('p2r')||0];
+ const nm=d=>{const n=[-d[1],d[0]];let k=n[0]*t[0]+n[1]*t[1];if(Math.abs(k)<1e-9)k=-(n[1]||n[0]);return k>0?[-n[0],-n[1]]:n};
+ const N=dd.map(nm);
+ const mk=(Rn,tv)=>{const O=dd.map((d,i)=>[pts[i][0]+N[i][0]*Rn,pts[i][1]+N[i][1]*Rn]),sh=[tv[0]*Rn,tv[1]*Rn],ad=p=>[p[0]+sh[0],p[1]+sh[1]],cs=[];
+  for(let k=1;k<=2;k++){const di=dd[k-1],dO=dd[k],Rf=fr[k-1],P=pts[k];
+   if(Rf>0){const cr=di[0]*dO[1]-di[1]*dO[0],dt=Math.max(-1,Math.min(1,di[0]*dO[0]+di[1]*dO[1])),tl=Rf*Math.tan(Math.acos(dt)/2);
+    const Ta=[P[0]-di[0]*tl,P[1]-di[1]*tl],Tb=[P[0]+dO[0]*tl,P[1]+dO[1]*tl],left=cr>0,nl=left?[-di[1],di[0]]:[di[1],-di[0]],c=[Ta[0]+nl[0]*Rf,Ta[1]+nl[1]*Rf];
+    const ro=(N[k-1][0]*nl[0]+N[k-1][1]*nl[1]>0)?Rf-Rn:Rf+Rn;
+    cs.push({a:ad([Ta[0]+N[k-1][0]*Rn,Ta[1]+N[k-1][1]*Rn]),b:ad([Tb[0]+N[k][0]*Rn,Tb[1]+N[k][1]*Rn]),c:ad(c),ro,left,tl,bad:ro<=0})}
+   else{const J=ad(inter(O[k-1],di,O[k],dO));cs.push({a:J,b:J,c:null,tl:0})}}
+  return{cs,A:ad(O[0]),B:ad(O[2])}};
+ const pp=mk(0,[0,0]),cp=mk(R,[0,0]),tp=mk(R,t);
+ if([pp,cp].some(p=>p.cs.some(c=>c.bad))||pp.cs[0].tl+pp.cs[1].tl>hyp+1e-9){$('err').textContent='Radijus na fazi je prevelik (ili manji od radijusa pločice).';return}
+ const ln=p=>`X${(p[1]/f).toFixed(3)} Z${p[0].toFixed(3)}`;
+ const gc=pa=>{const o=[],[c1,c2]=pa.cs;let n=1;const arc=c=>`${c.left?'G3':'G2'} ${ln(c.b)} R${c.ro.toFixed(3)}`;
+  o.push(`G1 ${ln(c1.a)}`);if(c1.c)o.push(arc(c1));o.push(`G1 ${ln(c2.a)}`);if(c2.c)o.push(arc(c2));return o.join('\n')};
+
+ $('out').textContent=gc(tp);
+ H={t:tip,pp,cp,A,B,P1,P2,R,th:Math.atan2(h,w),dz,dx};draw();
+}
+function draw(){
+ if(!H)return;const cv=$('cv'),g=cv.getContext('2d'),W=cv.width,Hh=cv.height;g.clearRect(0,0,W,Hh);
+ const all=[H.A,H.B,H.P1,H.P2],xs=all.map(p=>p[0]),ys=all.map(p=>p[1]),pad=70;
+ const mx=Math.min(...xs),Mx=Math.max(...xs),my=Math.min(...ys),My=Math.max(...ys),s=Math.min((W-2*pad)/(Mx-mx||1),(Hh-2*pad)/(My-my||1));
+ const X=p=>pad+(p[0]-mx)*s+((W-2*pad)-(Mx-mx)*s)/2,Y=p=>Hh-pad-(p[1]-my)*s-((Hh-2*pad)-(My-my)*s)/2;
+ const fg=getComputedStyle(document.body).color;
+ const line=(a,b,c,wd)=>{g.beginPath();g.moveTo(X(a),Y(a));g.lineTo(X(b),Y(b));g.strokeStyle=c;g.lineWidth=wd;g.stroke()};
+ const stroke=(pa,c,wd)=>{g.beginPath();g.moveTo(X(pa.A),Y(pa.A));pa.cs.forEach(k=>{g.lineTo(X(k.a),Y(k.a));if(k.c){const a0=Math.atan2(-(k.a[1]-k.c[1]),k.a[0]-k.c[0]),a1=Math.atan2(-(k.b[1]-k.c[1]),k.b[0]-k.c[0]);g.arc(X(k.c),Y(k.c),k.ro*s,a0,a1,k.left)}});g.lineTo(X(pa.B),Y(pa.B));g.strokeStyle=c;g.lineWidth=wd;g.lineJoin='round';g.stroke()};
+ stroke(H.pp,'#6cc070',8);stroke(H.cp,'#d33',1.5);const c1=H.cp.cs[0].a;
+ g.beginPath();g.arc(X(c1),Y(c1),Math.max(H.R*s,4),0,7);g.strokeStyle='#d33';g.lineWidth=2;g.stroke();
+ g.fillStyle='#2e7d32';g.font='20px sans-serif';[[H.P1,'Početak'],[H.P2,'Kraj']].forEach(([p,n])=>{g.beginPath();g.arc(X(p),Y(p),6,0,7);g.fill();g.fillText(n,X(p)+10,Y(p)-12)});
+ const cx=X(H.P1),cy=Y(H.P1),r=45;g.strokeStyle='#2e7d32';g.lineWidth=1.5;
+ g.beginPath();g.moveTo(cx,cy);g.lineTo(cx-110,cy);g.stroke();
+ const phi=Math.atan2(-H.dx*Math.sin(H.th),-Math.cos(H.th)),mid=Math.PI+H.dx*H.th/2;
+ g.beginPath();g.arc(cx,cy,r,Math.PI,phi,H.dx<0);g.stroke();
+ g.font='16px sans-serif';g.fillText('Theta',cx+(r+6)*Math.cos(mid)-45,cy+(r+6)*Math.sin(mid)+(H.dx>0?14:-4));
+ const t=H.t;let ang;
+ if(t[0]&&t[1]){ang=[90,90-INS.ang].map(v=>v*Math.PI/180);if(t[0]>0)ang=ang.map(v=>Math.PI-v);if(t[1]>0)ang=ang.map(v=>-v)}
+ else{const bb=Math.atan2(-t[1],-t[0]),d=INS.ang/2*Math.PI/180;ang=[bb-d,bb+d]}
+ const px=X(c1),py=Y(c1),l=Math.min(INS.l*s,170),u=ang.map(v=>[Math.cos(v),-Math.sin(v)]);
+ const A1=[px+u[0][0]*l,py+u[0][1]*l],B1=[px+u[1][0]*l,py+u[1][1]*l];
+ g.beginPath();if(INS.sh=='R'){g.arc(px,py,Math.min((INS.ic||10)/2*s,85),0,7)}else{g.moveTo(px,py);g.lineTo(...A1);if(INS.sh!='T'&&INS.sh!='W')g.lineTo(A1[0]+B1[0]-px,A1[1]+B1[1]-py);g.lineTo(...B1);g.closePath()}
+ g.fillStyle='rgba(240,160,64,.25)';g.fill();g.strokeStyle=fg;g.lineWidth=1.5;g.stroke();
+ 
+}
+$('calc').onclick=calc;$('clr').onclick=()=>{['p1x','p1z','p2x','p2z','I','K'].forEach(i=>{$(i).value='';$(i).dataset.t=''});$('p1r').value=$('p2r').value='';$('th').dataset.t='';$('th').value=45;H=null;$('out').textContent='N1 G1 X0.';$('cv').getContext('2d').clearRect(0,0,560,560)};
+['p1x','p1z','p2x','p2z','I','K','th'].forEach(id=>$(id).addEventListener('input',e=>{e.target.dataset.t=e.target.value===''?'':'1'}));
+document.querySelectorAll('#rc button').forEach(e=>e.onclick=()=>{$('R').value=e.dataset.r;if(H)calc()});
+['R','dia','p1r','p2r'].forEach(id=>['input','change'].forEach(ev=>$(id).addEventListener(ev,()=>{if(H)calc()})));
+
+const SHP={V:[35,'Romb 35°'],D:[55,'Romb 55°'],C:[80,'Romb 80°'],S:[90,'Kvadrat 90°'],T:[60,'Trougao 60°'],W:[80,'Trigon 80°'],R:[0,'Okrugla']};
+const ICM={V:{'11':6.35,'16':9.525,'22':12.7},D:{'07':6.35,'11':9.525,'15':12.7},T:{'09':5.56,'11':6.35,'16':9.525,'22':12.7},W:{'04':6.35,'06':9.525,'08':12.7}},ICG={'06':6.35,'09':9.525,'12':12.7,'16':15.875,'19':19.05};
+const CL={N:0,A:3,B:5,C:7,P:11,D:15,E:20},TH={'01':1.59,'02':2.38,'03':3.18,'T3':3.97,'04':4.76,'06':6.35,'07':7.94,'09':9.52};
+const TL={M:'M (standardna)',G:'G (brušena, precizna)',E:'E (brušena, vrlo precizna)',C:'C (precizna)',U:'U (gruba)'};
+const TY={X:'poseban oblik (npr. oštra ivica, bez lomača)',N:'bez rupe',R:'bez rupe, lomač 1 strana',F:'bez rupe, lomač 2 strane',A:'sa rupom',M:'rupa + lomač 1 strana',G:'rupa + lomač 2 strane',W:'jednostrana, rupa 40-60°',T:'jednostrana, rupa + lomač',Q:'dvostrana, rupa 40-60°',U:'dvostrana, rupa + lomač'};
+function parseIns(c){const m=c.toUpperCase().replace(/\s/g,'').match(/^([A-Z])([A-Z])([A-Z])([A-Z])(\d{2})([0-9T]\d)(\d{2})/);if(!m)return null;
+ const[,sh,cl,tol,ty,sz,th,nr]=m,S=SHP[sh];if(!S)return null;
+ const IC=(ICM[sh]||ICG)[sz]||null,al=S[0],rad=Math.PI/180;
+ const l=IC?(sh=='T'?IC*Math.sqrt(3):sh=='W'?IC*.685:(sh=='R'||sh=='S')?IC:IC/Math.sin(al*rad)):null;
+ return{sh,al:al||35,cl:CL[cl],tol,ty,IC,l,th:TH[th],r:+nr/10,name:S[1],code:m[0]}}
+function insSvg(p){const k=46,a=p.al*Math.PI/180;let sh,nose;const st='fill="rgba(150,150,160,.35)" stroke="currentColor" stroke-width="3" stroke-linejoin="round"';
+ if(p.sh=='R'){sh=`<circle r="${k}" ${st}/>`;nose=[k,0]}
+ else if(p.sh=='T'||p.sh=='W'){const q=p.sh=='T'?[0,0,0]:[1,1,1],pt=[];for(let i=0;i<3;i++){const g1=(-90+120*i)*Math.PI/180,g2=g1+Math.PI/3,rr=p.sh=='W'?k*.58:k;pt.push([k*Math.cos(g1),k*Math.sin(g1)]);if(p.sh=='W')pt.push([rr*Math.cos(g2),rr*Math.sin(g2)])}sh=`<polygon points="${pt.map(v=>v.map(x=>x.toFixed(1)).join(',')).join(' ')}" ${st}/>`;nose=pt[0]}
+ else{const b=k*Math.tan(a/2),hh=p.sh=='S'?k*.72:b,ww=p.sh=='S'?k*.72:k;sh=`<polygon points="${ww},0 0,${-hh} ${-ww},0 0,${hh}" ${st}/>`;nose=[ww,0]}
+ const hole='AMGWTQUBH'.includes(p.ty)?`<circle r="${k*.2}" fill="none" stroke="currentColor" stroke-width="2"/>`:'';
+ return`<svg viewBox="-60 -60 120 120" width="110" height="110" style="color:var(--fg);flex:none">${sh}${hole}<circle cx="${nose[0]}" cy="${nose[1]}" r="5" fill="#f0a040" stroke="#333"/></svg>`}
+function applyIns(){const v=$('code').value,p=parseIns(v);if(!p){$('info').textContent=v?'Nepoznata oznaka':'';return}
+ INS={ang:p.al,sh:p.sh,l:p.l||11,ic:p.IC};if(p.r>0)$('R').value=p.r;
+ $('info').innerHTML=insSvg(p)+`<div><b>${p.code}</b><br>Oblik: ${p.name}<br>Zazor: ${p.cl===undefined?'?':p.cl+'°'+(p.cl==0?' (negativna)':' (pozitivna)')}<br>Tolerancija: ${TL[p.tol]||p.tol}<br>Tip: ${TY[p.ty]||p.ty}<br>IC: ${p.IC==null?'?':p.IC} mm${p.l?', ivica ≈ '+p.l.toFixed(1)+' mm':''}<br>Debljina: ${p.th==null?'?':p.th} mm<br>Radijus vrha: ${p.r?p.r+' mm':'poseban'}</div>`;
+ build();if(H)calc()}
+$('code').addEventListener('input',applyIns);
+['WNMG080408','WNMG060408','CNMG120408','CNMG120404','VCMT160404','VCMT110304','VCGT160404','VCGT110302','CCMT09T304','CCMT060204','DCMT11T304','DCMT070204','DCGX11T302','DCGX070202','VCGX160404','VCGX110302','WBMT060204'].forEach(c=>{const e=document.createElement('button');e.className='b';e.textContent=c;e.style.fontSize='13px';e.onclick=()=>{$('code').value=c;applyIns()};$('chips').append(e)});
+let lf=null;
+const pm=document.createElement('button');pm.id='pm';pm.textContent='±';pm.type='button';document.body.appendChild(pm);
+['p1x','p1z','p2x','p2z'].forEach(id=>$(id).classList.add('sg'));
+const showPm=el=>{if(!el||!el.classList||!el.classList.contains('sg')){pm.style.display='none';return}const r=el.getBoundingClientRect();pm.style.top=(r.top+window.scrollY+(r.height-34)/2)+'px';pm.style.left=(r.right+window.scrollX-42)+'px';pm.style.display='block'};
+document.addEventListener('focusin',e=>{if(e.target&&e.target.getAttribute&&e.target.getAttribute('inputmode')=='decimal'){lf=e.target;showPm(lf)}});
+document.addEventListener('focusout',()=>setTimeout(()=>{if(document.activeElement!==lf)pm.style.display='none'},250));
+window.addEventListener('resize',()=>{if(lf&&pm.style.display=='block')showPm(lf)});
+const flip=()=>{if(!lf)return;const v=lf.value.trim();lf.value=v.startsWith('-')?v.slice(1):(v===''?'-':'-'+v);lf.dataset.t=(lf.value===''||lf.value==='-')?'':'1';lf.focus()};
+[pm,$('sign')].forEach(b=>{b.addEventListener('pointerdown',e=>e.preventDefault());b.onclick=flip});
+build();
+</script></body></html>
