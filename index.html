@@ -1,4 +1,4 @@
-<!DOCTYPE html><html lang="sr"><head><meta charset="utf-8"><title>CNC Konus</title>
+<!DOCTYPE html><html lang="sr"><head><meta charset="utf-8"><link rel="manifest" href="manifest.json"><title>CNC Konus</title>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <style>
 :root{--bg:#fafafa;--fg:#222;--card:#e3e3e3;--on:#ffe97a;--line:#999;--g:#4caf50;--r:#d33;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
@@ -155,4 +155,8 @@ window.addEventListener('resize',()=>{if(lf&&pm.style.display=='block')showPm(lf
 const flip=()=>{if(!lf)return;const v=lf.value.trim();lf.value=v.startsWith('-')?v.slice(1):(v===''?'-':'-'+v);lf.dataset.t=(lf.value===''||lf.value==='-')?'':'1';lf.focus()};
 [pm,$('sign')].forEach(b=>{b.addEventListener('pointerdown',e=>e.preventDefault());b.onclick=flip});
 build();
+</script><script>
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('sw.js');
+  }
 </script></body></html>
