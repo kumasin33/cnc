@@ -1,0 +1,13 @@
+{
+  "background_color": "#ffffff",
+  "dir": "ltr",
+  "display": "standalone",
+  "name": "CNC Kalkulato",
+  "orientation": "any",
+  "scope": "/",
+  "short_name": "CNC chamfer",
+  "start_url": "/",
+  "theme_color": "#ffffff",
+  "id": "/cnc/",
+  "description": "Kalkulator i alati za CNC obradu"
+}
